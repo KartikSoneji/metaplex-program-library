@@ -3828,6 +3828,13 @@ async fn execute_sale_creator_mixed_funded() {
 }
 
 async fn execute_sale_with_creators(metadata_creators: Vec<(Pubkey, u8, bool)>) {
+    execute_sale_with_creators_and_sfbp(metadata_creators, 10).await;
+}
+
+async fn execute_sale_with_creators_and_sfbp(
+    metadata_creators: Vec<(Pubkey, u8, bool)>,
+    seller_fee_basis_points: u16,
+) {
     let mut context = auction_house_program_test().start_with_context().await;
     // Payer Wallet
     let (ah, ahkey, authority) = existing_auction_house_test_context(&mut context)
@@ -3860,7 +3867,7 @@ async fn execute_sale_with_creators(metadata_creators: Vec<(Pubkey, u8, bool)>) 
                     })
                     .collect(),
             ),
-            10,
+            seller_fee_basis_points,
             false,
             1,
         )
@@ -4019,20 +4026,58 @@ async fn execute_sale_with_creators(metadata_creators: Vec<(Pubkey, u8, bool)>) 
         .unwrap()
         .is_none();
 
-    for (creator_before, creator_after) in metadata_creators_before
+    let royalty = (test_metadata
+        .get_data(&mut context)
+        .await
+        .data
+        .seller_fee_basis_points as u64
+        * 100_000_000)
+        / 10000;
+    let mut paid_royalty: u64 = 0;
+    for (((_, share, _), creator_before_option), creator_after_option) in metadata_creators
         .iter()
+        .zip(metadata_creators_before.iter())
         .zip(metadata_creators_after.iter())
     {
-        if creator_before.is_none() {
-            assert_eq!(creator_before.is_none(), creator_after.is_none());
-        } else {
-            assert!(
-                creator_before.as_ref().unwrap().lamports
-                    < creator_after.as_ref().unwrap().lamports
+        if creator_before_option.is_none() {
+            assert_eq!(
+                creator_before_option.is_none(),
+                creator_after_option.is_none()
             );
+        } else {
+            let creator_before = creator_before_option.as_ref().unwrap();
+            let creator_after = creator_after_option.as_ref().unwrap();
+
+            let creator_share = (royalty * (*share as u64)) / 100;
+            assert_eq!(
+                creator_before.lamports + creator_share,
+                creator_after.lamports
+            );
+
+            paid_royalty += creator_share;
         }
     }
+    assert_eq!((royalty, paid_royalty), (0, 0));
 
-    assert!(seller_before.lamports < seller_after.lamports);
+    let fee_minus: u64 = 100_000_000
+        - paid_royalty
+        - ((ah.seller_fee_basis_points as u64 * (100_000_000 - paid_royalty)) / 10000);
+
+    assert_eq!(
+        seller_before.lamports + fee_minus,
+        seller_after.lamports
+    );
+    assert_eq!((seller_before.lamports, seller_after.lamports), (0, 0));
+    assert!(seller_before.lamports <= seller_after.lamports);
     assert_eq!(buyer_token_after.amount, 1);
+}
+
+#[tokio::test]
+async fn execute_sale_ah_nft_sfbp_overflow() {
+    execute_sale_with_creators_and_sfbp(vec![(Pubkey::new_unique(), 100, true)], 9900).await;
+}
+
+#[tokio::test]
+async fn execute_sale_10000_sfbp_nft() {
+    execute_sale_with_creators_and_sfbp(vec![(Pubkey::new_unique(), 100, true)], 10000).await;
 }
