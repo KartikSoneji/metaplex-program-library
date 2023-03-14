@@ -1269,7 +1269,7 @@ fn auctioneer_execute_sale_logic<'c, 'info>(
         &token_clone,
         &sys_clone,
         &signer_seeds_for_royalties,
-        price,
+        buyer_leftover_after_royalties,
         is_native,
     )?;
 
@@ -1738,7 +1738,7 @@ fn execute_sale_logic<'c, 'info>(
         &token_clone,
         &sys_clone,
         &signer_seeds_for_royalties,
-        price,
+        buyer_leftover_after_royalties,
         is_native,
     )?;
 
