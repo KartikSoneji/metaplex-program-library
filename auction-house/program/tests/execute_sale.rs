@@ -14,11 +14,11 @@ use utils::{
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use mpl_auction_house::pda::find_auctioneer_pda;
-use mpl_token_metadata::state::Creator;
 use mpl_testing_utils::{
     solana::{airdrop, create_associated_token_account, transfer},
     utils::Metadata,
 };
+use mpl_token_metadata::state::Creator;
 use solana_sdk::{
     account::Account as SolanaAccount, commitment_config::CommitmentLevel, signer::Signer,
 };
@@ -4063,10 +4063,7 @@ async fn execute_sale_with_creators_and_sfbp(
         - paid_royalty
         - ((ah.seller_fee_basis_points as u64 * (100_000_000 - paid_royalty)) / 10000);
 
-    assert_eq!(
-        seller_before.lamports + fee_minus,
-        seller_after.lamports
-    );
+    assert_eq!(seller_before.lamports + fee_minus, seller_after.lamports);
     assert_eq!((seller_before.lamports, seller_after.lamports), (0, 0));
     assert!(seller_before.lamports <= seller_after.lamports);
     assert_eq!(buyer_token_after.amount, 1);
